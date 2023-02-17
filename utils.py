@@ -138,7 +138,7 @@ def load_tokenizer_hparams_and_params(model_name, models_dir):
     return tokenizer, hparams, params
 
 
-def tokenize(tokenizer, text_a, text_b=None, mask_prob=0.0):
+def tokenize(tokenizer, text_a, text_b=None):
     tokens_a = tokenizer.tokenize(text_a)
     tokens_b = tokenizer.tokenize(text_b) if text_b else []
 
@@ -146,12 +146,17 @@ def tokenize(tokenizer, text_a, text_b=None, mask_prob=0.0):
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
     segment_ids = [0] + [0] * len(tokens_a) + [0] + [1] * len(tokens_b) + [1]
 
-    masked_input_ids = input_ids[:]
-    masked_tokens = tokens[:]
-    for i in np.random.choice(len(tokens), int(len(tokens) * mask_prob), replace=False):
-        if tokens[i] in [["[CLS]", "[SEP]"]]:  # skip for cls or sep tokens
-            continue
-        masked_tokens[i] = "[MASK]"
-        masked_input_ids[i] = tokenizer.vocab["[MASK]"]
+    return tokens, input_ids, segment_ids
 
-    return tokens, input_ids, segment_ids, masked_tokens, masked_input_ids
+
+def mask_tokens(tokenizer, input_ids, mask_prob):
+    CLS_ID, SEP_ID, MASK_ID = tokenizer.vocab["[CLS]"], tokenizer.vocab["[SEP]"], tokenizer.vocab["[MASK]"]
+
+    masked_indices = np.random.choice(len(input_ids), int(len(input_ids) * mask_prob), replace=False)
+    masked_indices = list(filter(lambda i: i not in {CLS_ID, SEP_ID}, masked_indices))  # dont mask cls or sep
+
+    masked_input_ids = input_ids[:]
+    for i in masked_indices:
+        masked_input_ids[i] = MASK_ID
+
+    return masked_input_ids, masked_indices
