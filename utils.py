@@ -136,3 +136,22 @@ def load_tokenizer_hparams_and_params(model_name, models_dir):
     params = load_bert_params_from_tf_ckpt(tf_ckpt_path, hparams)
 
     return tokenizer, hparams, params
+
+
+def tokenize(tokenizer, text_a, text_b=None, mask_prob=0.0):
+    tokens_a = tokenizer.tokenize(text_a)
+    tokens_b = tokenizer.tokenize(text_b) if text_b else []
+
+    tokens = ["[CLS]"] + tokens_a + ["[SEP]"] + tokens_b + ["[SEP]"]
+    input_ids = tokenizer.convert_tokens_to_ids(tokens)
+    segment_ids = [0] + [0] * len(tokens_a) + [0] + [1] * len(tokens_b) + [1]
+
+    masked_input_ids = input_ids[:]
+    masked_tokens = tokens[:]
+    for i in np.random.choice(len(tokens), int(len(tokens) * mask_prob), replace=False):
+        if tokens[i] in [["[CLS]", "[SEP]"]]:  # skip for cls or sep tokens
+            continue
+        masked_tokens[i] = "[MASK]"
+        masked_input_ids[i] = tokenizer.vocab["[MASK]"]
+
+    return tokens, input_ids, segment_ids, masked_tokens, masked_input_ids

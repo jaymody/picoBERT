@@ -63,3 +63,54 @@ def mlm_head(x, wte, fc, ln, bias):
     x = linear(x, **fc)
     x = layer_norm(x, **ln)
     return linear(x, wte.T, bias)
+
+
+def main(
+    text_a: str,
+    text_b: str = None,
+    model_name: str = "bert-base-uncased",
+    models_dir: str = "models",
+    mask_prob: float = 0.15,
+    seed: int = 123,
+):
+    np.random.seed(seed)
+    from utils import load_tokenizer_hparams_and_params, tokenize
+
+    tokenizer, hparams, params = load_tokenizer_hparams_and_params(
+        model_name,
+        models_dir,
+    )
+
+    tokens, input_ids, segment_ids, masked_tokens, masked_input_ids = tokenize(
+        tokenizer,
+        text_a,
+        text_b,
+        mask_prob,
+    )
+
+    assert len(input_ids) <= hparams["max_position_embeddings"]
+    layer_embeddings, pooled_embedding = bert(
+        masked_input_ids if mask_prob > 0 else input_ids,
+        segment_ids,
+        **params["bert"],
+        n_head=hparams["num_attention_heads"],
+    )
+
+    if mask_prob > 0:
+        mlm_logits = mlm_head(layer_embeddings[-1], params["bert"]["wte"], **params["mlm"])
+        correct = [
+            input_ids[i] == np.argmax(mlm_logits[i])
+            for i, token in enumerate(masked_tokens)
+            if token == "[MASK]"
+        ]
+        print(f"mlm_accuracy = {sum(correct) / len(correct)}")
+
+    if text_b:
+        nsp_logits = nsp_head(pooled_embedding, **params["nsp"])
+        print(f"is_next_sentence = {np.argmax(nsp_logits) == 0}")
+
+
+if __name__ == "__main__":
+    import fire
+
+    fire.Fire(main)
