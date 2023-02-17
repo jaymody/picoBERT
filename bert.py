@@ -78,16 +78,23 @@ def bert(input_ids, token_type_ids, params, n_head, nsp=False, mlm=False):
 
 
 def tokenize(tokenizer, text_a, text_b=None):
-    tokens = ["[CLS]"] + tokenizer.tokenize(text_a) + ["[SEP]"]
-    token_type_ids = [0] * len(tokens)
+    tokens_a = tokenizer.tokenize(text_a)
+    tokens_b = tokenizer.tokenize(text_b) if text_b else []
 
-    if text_b is not None:
-        tokens_b = tokenizer.tokenize(text_b) + ["[SEP]"]
-        tokens += tokens_b
-        token_type_ids += [1] * len(tokens_b)
+    tokens = ["[CLS]"] + tokens_a + ["[SEP]"] + tokens_b + ["[SEP]"]
+    token_type_ids = [0] + [0] * len(tokens_a) + [0] + [1] * len(tokens_b) + [1]
 
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
     return tokens, input_ids, token_type_ids
+
+
+def mask_tokens(tokens, p):
+    masked_tokens = tokens[:]
+    for i in np.random.choice(len(tokens), int(len(tokens) * p), replace=False):
+        if tokens[i] in [["[CLS]", "[SEP]"]]:  # skip for cls or sep tokens
+            continue
+        masked_tokens[i] = "[MASK]"
+    return masked_tokens
 
 
 def main(
@@ -95,11 +102,20 @@ def main(
     text_b: str = None,
     model_name: str = "uncased_L-12_H-768_A-12",
     models_dir: str = "models",
+    do_nsp: bool = True,
+    do_mlm: bool = True,
+    mask_prob: float = 0.15,
+    seed: int = 123,
 ):
     from utils import load_tokenizer_config_and_params
 
+    np.random.seed(seed)
+
     tokenizer, config, params = load_tokenizer_config_and_params(model_name, models_dir)
     tokens, input_ids, token_type_ids = tokenize(tokenizer, text_a, text_b)
+    if do_mlm:
+        masked_tokens = mask_tokens(tokens, mask_prob)
+        input_ids = tokenizer.convert_tokens_to_ids(masked_tokens)
 
     assert len(input_ids) <= config["max_position_embeddings"]
 
@@ -108,11 +124,21 @@ def main(
         token_type_ids=token_type_ids,
         params=params,
         n_head=config["num_attention_heads"],
-        nsp=True,
-        mlm=True,
+        nsp=do_nsp,
+        mlm=do_mlm,
     )
 
-    return "yes" if np.argmax(output["nsp"]) == 0 else "no"
+    if do_mlm:
+        n_correct = []
+        for i, token in enumerate(masked_tokens):
+            if token == "[MASK]":
+                logits = output["mlm"][i]
+                pred = tokenizer.inv_vocab[np.argmax(logits)]
+                n_correct.append(tokens[i] == pred)
+        print(f"mlm_accuracy = {sum(n_correct) / len(n_correct)}")
+
+    if do_nsp and text_b:
+        print(f"is_next_sentence = {np.argmax(output['nsp']) == 0}")
 
 
 if __name__ == "__main__":
