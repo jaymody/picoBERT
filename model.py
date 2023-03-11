@@ -18,24 +18,28 @@ def linear(x, w, b):
 def ffn(x, c_fc, c_proj):
     return linear(gelu(linear(x, **c_fc)), **c_proj)
 
-def attention(q, k, v, mask):
-    return softmax(q @ k.T / np.sqrt(q.shape[-1]) + mask) @ v
+def attention(q, k, v):
+    return softmax(q @ k.T / np.sqrt(q.shape[-1])) @ v
 
 def mha(x, c_attn, c_proj, n_head):
     x = linear(x, **c_attn)
     qkv_heads = list(map(lambda x: np.split(x, n_head, axis=-1), np.split(x, 3, axis=-1)))
-    casual_mask = (1 - np.tri(x.shape[0])) * -1e10
-    out_heads = [attention(q, k, v, casual_mask) for q, k, v in zip(*qkv_heads)]
+    out_heads = [attention(q, k, v) for q, k, v in zip(*qkv_heads)]
     x = linear(np.hstack(out_heads), **c_proj)
     return x
 
 def transformer_block(x, mlp, attn, ln_1, ln_2, n_head):
-    x = x + mha(layer_norm(x, **ln_1), **attn, n_head=n_head)
-    x = x + ffn(layer_norm(x, **ln_2), **mlp)
+    x = layer_norm(x + mha(x, **attn, n_head=n_head), **ln_1)
+    x = layer_norm(x + ffn(x, **mlp), **ln_2)
     return x
 
-def gpt2(inputs, wte, wpe, blocks, ln_f, n_head):
-    x = wte[inputs] + wpe[range(len(inputs))]
+def bert(input_ids, segment_ids, wte, wpe, wse, ln_e, blocks, pooler, n_head):
+    x = wte[input_ids] + wpe[range(len(input_ids))] + wse[segment_ids]
+    x += layer_norm(x, **ln_e)
+
     for block in blocks:
         x = transformer_block(x, **block, n_head=n_head)
-    return layer_norm(x, **ln_f) @ wte.T
+
+    seq_output = x
+    pooled_output = np.tanh(linear(x[0], **pooler))
+    return seq_output, pooled_output
