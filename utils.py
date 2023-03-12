@@ -139,12 +139,12 @@ def load_tokenizer_hparams_and_params(model_name, models_dir):
 
 
 def tokenize(tokenizer, text_a, text_b=None):
-    tokens_a = tokenizer.tokenize(text_a)
-    tokens_b = tokenizer.tokenize(text_b) if text_b else []
+    tokens_a = ["[CLS]"] + tokenizer.tokenize(text_a) + ["[SEP]"]
+    tokens_b = (tokenizer.tokenize(text_b) + ["[SEP]"]) if text_b else []
 
-    tokens = ["[CLS]"] + tokens_a + ["[SEP]"] + tokens_b + ["[SEP]"]
+    tokens = tokens_a + tokens_b
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    segment_ids = [0] + [0] * len(tokens_a) + [0] + [1] * len(tokens_b) + [1]
+    segment_ids = [0] * len(tokens_a) + [1] * len(tokens_b)
 
     return tokens, input_ids, segment_ids
 
