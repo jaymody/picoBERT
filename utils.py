@@ -147,16 +147,3 @@ def tokenize(tokenizer, text_a, text_b=None):
     segment_ids = [0] * len(tokens_a) + [1] * len(tokens_b)
 
     return tokens, input_ids, segment_ids
-
-
-def mask_tokens(tokenizer, input_ids, mask_prob):
-    CLS_ID, SEP_ID, MASK_ID = tokenizer.vocab["[CLS]"], tokenizer.vocab["[SEP]"], tokenizer.vocab["[MASK]"]
-
-    masked_indices = np.random.choice(len(input_ids), int(len(input_ids) * mask_prob), replace=False)
-    masked_indices = list(filter(lambda i: i not in {CLS_ID, SEP_ID}, masked_indices))  # dont mask cls or sep
-
-    masked_input_ids = input_ids[:]
-    for i in masked_indices:
-        masked_input_ids[i] = MASK_ID
-
-    return masked_input_ids, masked_indices
