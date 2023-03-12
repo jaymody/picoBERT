@@ -51,7 +51,7 @@ pred: head
 
 Instead of predicting the word "newton", it predicted the word "one", which still gives a valid sentence "Instead, it falls on one's head.".
 
-For a demo of training an SKLearn classifier using the BERT output embeddings as input on the [IMDB dataset](https://huggingface.co/datasets/imdb):
+For a demo of training an SKLearn classifier for the [IMDB dataset](https://huggingface.co/datasets/imdb), using BERT output embeddings as input to the classifier:
 ```bash
 python classify_demo.py
     dataset_name "imdb" \
@@ -61,7 +61,7 @@ python classify_demo.py
     models_dir "models"
 ```
 
-Which outputs:
+Which outputs (note, it takes a while to run the BERT model and extract all the embeddings):
 
 ```text
               precision    recall  f1-score   support
